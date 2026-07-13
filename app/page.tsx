@@ -1,65 +1,135 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import MobileContainer from "@/components/layout/MobileContainer";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/session";
+import { generateQuestionOrder } from "@/lib/questionOrder";
+
+// ─── Generátor knihovních jmen ────────────────────────────────────────────────
+const ADJECTIVES = [
+  "modrý", "zasněný", "mladý", "statečný", "chytrý", "milý", "tichý",
+  "zvídavý", "tvořivý", "moudrý", "odvážný", "hravý", "laskavý",
+  "bystrý", "klidný", "tajemný", "veselý", "pilný", "šikovný",
+  "prozíravý", "nadaný", "zvědavý", "všímavý", "věrný", "romantický",
+  "zvědavý", "tichý", "bledý", "ostrý", "bledý",
+];
+const NOUNS = [
+  "knihomol", "čtenář", "hrdina", "badatel", "písař", "knihovník",
+  "strážce", "kronikář", "vypravěč", "učitel", "mág", "poutník",
+  "hledač", "svědek", "stopař", "kartograf", "alchymista", "básník",
+  "detektiv", "luštitel", "archivář", "průzkumník", "učenec", "myslivec",
+];
+
+function genName(): string {
+  const a = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const n = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  return `${a}_${n}`;
+}
+
 
 export default function Home() {
+  const router = useRouter();
+  const { setSession } = useSession();
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+
+  const handleSolo = async () => {
+    if (loading) return;
+    setLoading(true);
+    setStatus("Připravujeme tvé jméno…");
+
+    // 1) Najdi volné jméno (max 20 pokusů, pak přidej číslo)
+    let name = "";
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = genName();
+      const { data: exists } = await supabase
+        .from("groups")
+        .select("id")
+        .eq("name", candidate)
+        .eq("is_solo", true)
+        .maybeSingle();
+      if (!exists) { name = candidate; break; }
+    }
+    if (!name) {
+      name = `${genName()}_${Math.floor(Math.random() * 1000)}`;
+    }
+
+    setStatus("Vytváříme tvou hru…");
+
+    // 2) Vytvoř sólo skupinu v DB
+    const order = await generateQuestionOrder();
+    const { data: group, error } = await supabase
+      .from("groups")
+      .insert({
+        class_id: null,
+        name,
+        question_order: order,
+        total_points: 0,
+        is_solo: true,
+      })
+      .select()
+      .single();
+
+    if (error || !group) {
+      setStatus("Nepodařilo se spustit hru. Zkus to znovu.");
+      setLoading(false);
+      return;
+    }
+
+    // 3) Nastav session
+    setSession({
+      mode: "solo",
+      groupId: group.id,
+      groupName: group.name,
+      classId: null,
+      questionOrder: order,
+      currentQuestionIndex: 0,
+    });
+
+    // 4) Přesměruj na úvod hry
+    router.push("/intro");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <MobileContainer>
+      <section className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div className="mb-8">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <rect x="10" y="15" width="28" height="50" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
+            <rect x="42" y="15" width="28" height="50" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
+            <line x1="38" y1="15" x2="38" y2="65" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
+            <rect x="16" y="24" width="16" height="2" rx="1" fill="rgba(255,255,255,0.3)"/>
+            <rect x="16" y="30" width="12" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+            <rect x="48" y="24" width="16" height="2" rx="1" fill="rgba(255,255,255,0.3)"/>
+            <rect x="48" y="30" width="12" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          </svg>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <h1 className="text-5xl font-extrabold leading-tight">
+          Zachraň
+          <br />
+          Gutenberga
+        </h1>
+        <p className="mt-6 text-white/70 text-lg leading-relaxed max-w-xs">
+          Dobrodružství mezi knihami.
+        </p>
+
+        {loading && (
+          <p className="mt-6 text-white/50 text-sm animate-pulse">{status}</p>
+        )}
+      </section>
+
+      <section className="p-6 pb-8 flex flex-col gap-3">
+        <Button onClick={handleSolo} disabled={loading}>
+          {loading ? "…" : "HRÁT"}
+        </Button>
+        <Button onClick={() => router.push("/join")} variant="secondary" disabled={loading}>
+          HRÁT JAKO TŘÍDA
+        </Button>
+      </section>
+    </MobileContainer>
   );
 }
