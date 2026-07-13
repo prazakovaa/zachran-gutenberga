@@ -450,7 +450,7 @@ export default function QuestionPage({
     return (
       <MobileContainer>
         <div className="flex items-center justify-between px-4 pt-4">
-          <PointsBadge points={currentPoints()} max={question.max_points} />
+          <PointsBadge points={currentPoints()} max={question.max_points ?? 0} />
         </div>
 
         <div className="flex-1 flex flex-col px-6 pt-6 gap-4">
