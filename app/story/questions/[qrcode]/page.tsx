@@ -167,8 +167,9 @@ export default function QuestionPage({
 
   const currentPoints = useCallback(() => {
     if (!question) return 0;
-    const lost = attempts * Math.floor(question.max_points / MAX_ATTEMPTS);
-    return Math.max(1, question.max_points - lost);
+    const maxPoints = question.max_points ?? 0;
+    const lost = attempts * Math.floor(maxPoints / MAX_ATTEMPTS);
+    return Math.max(1, maxPoints - lost);
   }, [question, attempts]);
 
   // Z "https://www.zachrangutenberga.cz/q5" vytáhne "q5"
