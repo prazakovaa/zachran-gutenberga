@@ -167,9 +167,8 @@ export default function QuestionPage({
 
   const currentPoints = useCallback(() => {
     if (!question) return 0;
-    const maxPoints = question.max_points ?? 0;
-    const lost = attempts * Math.floor(maxPoints / MAX_ATTEMPTS);
-    return Math.max(1, maxPoints - lost);
+    const lost = attempts * Math.floor(question.max_points / MAX_ATTEMPTS);
+    return Math.max(1, question.max_points - lost);
   }, [question, attempts]);
 
   // Z "https://www.zachrangutenberga.cz/q5" vytáhne "q5"
@@ -256,16 +255,28 @@ export default function QuestionPage({
         .from("gutenberg-photos")
         .getPublicUrl(fileName);
 
+      const isSolo = session.mode === "solo";
+      const maxPoints = question.max_points ?? 0;
+
       const { error: dbErr } = await supabase.from("answers").insert({
         group_id: session.groupId,
         question_id: question.id,
         answer_text: "(foto)",
-        points_earned: 0,
+        // Sólo hráč dostává body za foto rovnou automaticky (nikdo to
+        // ručně nehodnotí). Skupina ve třídě čeká na hodnocení adminem
+        // přes prezentaci ve třídě.
+        points_earned: isSolo ? maxPoints : 0,
         attempts: 1,
         photo_url: pub.publicUrl,
-        admin_graded: false,
+        admin_graded: isSolo,
+        admin_points: isSolo ? maxPoints : null,
       });
       if (dbErr) throw dbErr;
+
+      // Sólo bodujeme rovnou i na skupině (leaderboard se má aktualizovat hned)
+      if (isSolo && maxPoints > 0) {
+        await supabase.rpc("increment_group_points", { gid: session.groupId, pts: maxPoints });
+      }
 
       setPhase("correct");
     } catch (err: unknown) {
@@ -361,9 +372,19 @@ export default function QuestionPage({
               {isPhoto ? "Hotovo! 📷" : "Správně!"}
             </h2>
             <p className="text-white/70 mt-2 text-lg">
-              {isPhoto
-                ? "Admin tvou fotku zhodnotí později."
-                : <>Získáváš <span className="text-white font-bold">{currentPoints()} bodů</span></>}
+              {isPhoto ? (
+                <>
+                  To je opravdu zajímavé! Máš pravdu!
+                  {session?.mode === "solo" && (question.max_points ?? 0) > 0 && (
+                    <>
+                      <br />
+                      Získáváš <span className="text-white font-bold">{question.max_points} bodů</span>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>Získáváš <span className="text-white font-bold">{currentPoints()} bodů</span></>
+              )}
             </p>
           </div>
           <button
@@ -450,7 +471,7 @@ export default function QuestionPage({
     return (
       <MobileContainer>
         <div className="flex items-center justify-between px-4 pt-4">
-          <PointsBadge points={currentPoints()} max={question.max_points ?? 0} />
+          <PointsBadge points={currentPoints()} max={question.max_points} />
         </div>
 
         <div className="flex-1 flex flex-col px-6 pt-6 gap-4">

@@ -25,7 +25,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
 
   const handleLogin = () => {
     if (pw === ADMIN_PASSWORD) {
-      sessionStorage.setItem("admin_auth", "1");
+      localStorage.setItem("admin_auth", "1");
       onLogin();
     } else {
       setErr(true);
@@ -479,12 +479,12 @@ function QuestionsTab() {
               <QuestionQRDownload qrValue={q.qr_value} origin={origin} />
               {isPhoto && (
                 <a
-                  href={`/admin/present/${q.id}`}
+                  href={`/admin/gallery/${q.id}`}
                   target="_blank"
                   rel="noopener"
                   className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 rounded-lg px-3 py-1.5 text-sm text-center"
                 >
-                  📺 Prezentace
+                  🖼️ Fotogalerie
                 </a>
               )}
               <button onClick={() => handleDelete(q.id)} className="bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg px-3 py-1.5 text-sm">
@@ -670,6 +670,29 @@ function ClassesTab() {
                 </p>
               </div>
 
+              {questions.filter((q) => q.answer_mode === "photo").length > 0 && (
+                <div>
+                  <p className="text-white/50 text-xs uppercase tracking-wider mb-2">
+                    Prezentace fotoodpovědí
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {questions
+                      .filter((q) => q.answer_mode === "photo")
+                      .map((q) => (
+                        <a
+                          key={q.id}
+                          href={`/admin/present/${cls.id}/${q.id}`}
+                          target="_blank"
+                          rel="noopener"
+                          className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 rounded-lg px-3 py-1.5 text-sm"
+                        >
+                          📺 Prezentace {q.order_number}. otázky
+                        </a>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="text-white/50 text-xs uppercase tracking-wider mb-2">
                   Skupiny ({(groups[cls.id] ?? []).length})
@@ -728,7 +751,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"questions" | "classes">("questions");
 
   useEffect(() => {
-    if (sessionStorage.getItem("admin_auth") === "1") setAuthed(true);
+    if (localStorage.getItem("admin_auth") === "1") setAuthed(true);
   }, []);
 
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />;
@@ -738,7 +761,7 @@ export default function AdminPage() {
       <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
         <h1 className="font-bold text-lg">Zachraň Gutenberga · Admin</h1>
         <button
-          onClick={() => { sessionStorage.removeItem("admin_auth"); setAuthed(false); }}
+          onClick={() => { localStorage.removeItem("admin_auth"); setAuthed(false); }}
           className="text-white/40 hover:text-white text-sm"
         >
           Odhlásit

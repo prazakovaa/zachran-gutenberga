@@ -8,15 +8,32 @@
 -- Nově se do question_order ukládá přímo skutečná hodnota
 -- qr_value dané otázky, takže sloupec musí být textové pole.
 --
--- Spusť v Supabase > SQL Editor. Staré skupiny (groups), které
--- už mají uložené číselné pořadí, se touto migrací převedou
--- na "q" + číslo (odpovídá původnímu chování/qr_value formátu
--- "q1".."q10"). Pokud používáš jiný formát qr_value, uprav
--- si prosím ten "'q' ||" řádek podle svého skutečného formátu.
+-- Postgres nepovoluje poddotaz přímo v "ALTER COLUMN ... TYPE
+-- ... USING (...)" (chyba 0A000), proto jdeme přes dočasný
+-- sloupec: přidáme nový TEXT[] sloupec, naplníme ho převedenými
+-- hodnotami, smažeme starý sloupec a nový přejmenujeme zpět.
+--
+-- Pokud tvůj formát qr_value NENÍ "q" + číslo, uprav si prosím
+-- řádek s "'q' || elem::text" podle skutečného formátu předtím,
+-- než migraci spustíš.
 -- ============================================================
 
-ALTER TABLE groups
-  ALTER COLUMN question_order TYPE TEXT[]
-  USING (
-    ARRAY(SELECT 'q' || elem::text FROM unnest(question_order) AS elem)
-  );
+-- 1) dočasný sloupec
+ALTER TABLE groups ADD COLUMN question_order_text TEXT[];
+
+-- 2) převod hodnot (zachová pořadí díky WITH ORDINALITY)
+UPDATE groups
+SET question_order_text = (
+  SELECT array_agg('q' || elem::text ORDER BY ord)
+  FROM unnest(question_order) WITH ORDINALITY AS t(elem, ord)
+);
+
+-- 3) NOT NULL stejně jako měl původní sloupec
+ALTER TABLE groups ALTER COLUMN question_order_text SET NOT NULL;
+
+-- 4) smazat starý číselný sloupec
+ALTER TABLE groups DROP COLUMN question_order;
+
+-- 5) přejmenovat nový sloupec na původní název
+ALTER TABLE groups RENAME COLUMN question_order_text TO question_order;
+

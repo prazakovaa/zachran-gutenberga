@@ -35,18 +35,16 @@ CREATE TABLE answers (
 -- 4. OTÁZKY (editovatelné v adminu)
 CREATE TABLE questions (
   id              SERIAL PRIMARY KEY,
-  order_number    INTEGER NOT NULL UNIQUE,
-  background_url  TEXT,
-  teaser_text     TEXT NOT NULL,
-  detail_text     TEXT NOT NULL,
-  question_text   TEXT NOT NULL,
-  correct_answer  TEXT NOT NULL,
-  qr_value        TEXT NOT NULL UNIQUE,
-  max_points      INTEGER NOT NULL DEFAULT 10,
-  answer_mode     TEXT NOT NULL DEFAULT 'text',   -- 'text' nebo 'photo'
-  auto_grade      BOOLEAN NOT NULL DEFAULT TRUE,
-  is_fixed_first  BOOLEAN DEFAULT FALSE,
-  is_fixed_last   BOOLEAN DEFAULT FALSE
+  order_number    INTEGER NOT NULL UNIQUE,   -- 1–10
+  background_url  TEXT,                      -- URL obrázku z Supabase Storage
+  teaser_text     TEXT NOT NULL,             -- text na teaserové části (před QR)
+  detail_text     TEXT NOT NULL,             -- detail po načtení QR
+  question_text   TEXT NOT NULL,             -- samotná otázka
+  correct_answer  TEXT NOT NULL,             -- správná odpověď (lowercase)
+  qr_value        TEXT NOT NULL UNIQUE,      -- hodnota v QR kódu (např. "q1")
+  max_points      INTEGER DEFAULT 10,
+  is_fixed_first  BOOLEAN DEFAULT FALSE,     -- pevně první v pořadí
+  is_fixed_last   BOOLEAN DEFAULT FALSE      -- pevně poslední v pořadí
 );
 
 -- ============================================================
