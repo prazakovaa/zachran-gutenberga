@@ -119,6 +119,23 @@ function PointsBadge({ points, max }: { points: number; max: number }) {
   );
 }
 
+// ─── Gutenbergova poznámka ────────────────────────────────────────────────────
+function GutenbergNote({ text }: { text: string }) {
+  return (
+    <div className="flex gap-3 items-start bg-amber-200/10 border border-amber-200/25 rounded-2xl p-4">
+      <div className="w-9 h-9 rounded-full bg-amber-200/20 flex items-center justify-center shrink-0 text-lg">
+        🖋️
+      </div>
+      <div className="min-w-0">
+        <p className="text-amber-200/80 text-xs font-semibold uppercase tracking-wider mb-1">
+          Gutenbergova poznámka
+        </p>
+        <p className="text-white/90 leading-relaxed italic whitespace-pre-line">{text}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Hlavní stránka otázky ────────────────────────────────────────────────────
 export default function QuestionPage({
   params,
@@ -201,13 +218,13 @@ export default function QuestionPage({
   const handleSubmitAnswer = async () => {
     if (!question || submitting) return;
     const normalised = answer.trim().toLowerCase();
-    const correct = question.correct_answer.trim().toLowerCase();
+    const correct = (question.correct_answer ?? "").trim().toLowerCase();
 
     if (normalised !== correct) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       if (newAttempts >= MAX_ATTEMPTS) {
-        setWrongMsg(`Špatně. Správná odpověď je: ${question.correct_answer}`);
+        setWrongMsg(`Špatně. Správná odpověď je: ${question.correct_answer ?? ""}`);
       } else {
         setWrongMsg(`Špatně! Máš ještě ${MAX_ATTEMPTS - newAttempts} ${MAX_ATTEMPTS - newAttempts === 1 ? "pokus" : "pokusy"}.`);
       }
@@ -323,7 +340,7 @@ export default function QuestionPage({
           <p className="text-white/60">Jdi hledat jinam – správný QR kód tě pustí dál.</p>
           <button
             onClick={() => setPhase("teaser")}
-            className="bg-white text-[#0B5ED7] rounded-2xl px-6 py-3 font-bold"
+            className="bg-white text-[#363B60] rounded-2xl px-6 py-3 font-bold"
           >
             Zkusit znovu
           </button>
@@ -389,7 +406,7 @@ export default function QuestionPage({
           </div>
           <button
             onClick={handleContinue}
-            className="mt-4 w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl"
+            className="mt-4 w-full bg-white text-[#363B60] rounded-3xl font-black text-xl py-5 shadow-xl"
           >
             DALŠÍ STANOVIŠTĚ →
           </button>
@@ -418,15 +435,12 @@ export default function QuestionPage({
               </div>
             )}
 
-            <div className="bg-white/10 rounded-2xl p-4">
-              <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Detail</p>
-              <p className="text-white leading-relaxed">{question.detail_text}</p>
-            </div>
-
             <div className="bg-purple-600/15 border border-purple-500/30 rounded-2xl p-4">
               <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Tvůj úkol</p>
               <p className="text-white font-semibold text-lg leading-snug">{question.question_text}</p>
             </div>
+
+            {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
 
             {photoPreview ? (
               <div className="flex flex-col gap-3">
@@ -442,7 +456,7 @@ export default function QuestionPage({
                   <button
                     onClick={handlePhotoSubmit}
                     disabled={uploadingPhoto}
-                    className="flex-1 bg-white text-[#0B5ED7] rounded-2xl font-black py-3 disabled:opacity-40"
+                    className="flex-1 bg-white text-[#363B60] rounded-2xl font-black py-3 disabled:opacity-40"
                   >
                     {uploadingPhoto ? "Odesílám…" : "ODESLAT"}
                   </button>
@@ -451,7 +465,7 @@ export default function QuestionPage({
             ) : (
               <label className="block">
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
-                <div className="w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl text-center cursor-pointer">
+                <div className="w-full bg-white text-[#363B60] rounded-3xl font-black text-xl py-5 shadow-xl text-center cursor-pointer">
                   📷 VYFOTIT
                 </div>
               </label>
@@ -482,15 +496,12 @@ export default function QuestionPage({
             </div>
           )}
 
-          <div className="bg-white/10 rounded-2xl p-4">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Detail</p>
-            <p className="text-white leading-relaxed">{question.detail_text}</p>
-          </div>
-
           <div className="bg-white/15 rounded-2xl p-4 border border-white/20">
             <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Otázka</p>
             <p className="text-white font-semibold text-lg leading-snug">{question.question_text}</p>
           </div>
+
+          {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
 
           <div className="flex gap-2">
             <input
@@ -507,7 +518,7 @@ export default function QuestionPage({
             <button
               onClick={handleSubmitAnswer}
               disabled={!answer.trim() || submitting || isOutOfAttempts}
-              className="bg-white text-[#0B5ED7] rounded-2xl px-5 font-bold disabled:opacity-40"
+              className="bg-white text-[#363B60] rounded-2xl px-5 font-bold disabled:opacity-40"
             >
               →
             </button>
@@ -553,22 +564,23 @@ export default function QuestionPage({
           <div className="w-full h-52 relative overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={question.background_url} alt="Stanoviště" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0B5ED7]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#363B60]" />
           </div>
         )}
 
         <div className="px-6 pt-4 flex-1 flex flex-col gap-4">
           <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Příběh</p>
-            <p className="text-white text-lg leading-relaxed font-medium">{question.teaser_text}</p>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Legenda</p>
+            <p className="text-white text-lg leading-relaxed font-medium whitespace-pre-line">
+              {question.legend_text}
+            </p>
           </div>
-          <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Detail</p>
-            <p className="text-white leading-relaxed">{question.detail_text}</p>
-          </div>
+
+          {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
+
           {isPhoto && (
             <div className="bg-purple-600/20 border border-purple-500/30 rounded-2xl p-3 text-purple-100 text-sm text-center">
-              📷 Na tomto stanovišti budeš fotit
+              Na tomto stanovišti budeš fotit
             </div>
           )}
         </div>

@@ -45,7 +45,7 @@ export default function EndPage() {
           {session?.mode === "group" && (
             <button
               onClick={() => router.push("/leaderboard")}
-              className="w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl"
+              className="w-full bg-white text-[#363B60] rounded-3xl font-black text-xl py-5 shadow-xl"
             >
               ŽEBŘÍČEK
             </button>

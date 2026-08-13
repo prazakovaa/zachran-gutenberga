@@ -94,18 +94,10 @@ export default function Home() {
   };
 
   return (
-    <MobileContainer>
+    <MobileContainer bg="/backgrounds/bg1.webp" bgOpacity={20}>
       <section className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <div className="mb-8">
-          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-            <rect x="10" y="15" width="28" height="50" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-            <rect x="42" y="15" width="28" height="50" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-            <line x1="38" y1="15" x2="38" y2="65" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
-            <rect x="16" y="24" width="16" height="2" rx="1" fill="rgba(255,255,255,0.3)"/>
-            <rect x="16" y="30" width="12" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
-            <rect x="48" y="24" width="16" height="2" rx="1" fill="rgba(255,255,255,0.3)"/>
-            <rect x="48" y="30" width="12" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
-          </svg>
+        <div className="mb-8 animate-rise pb-5">
+          <img src="/logo.svg" alt="" width={150} height={30} />
         </div>
 
         <h1 className="text-5xl font-extrabold leading-tight">
@@ -114,7 +106,7 @@ export default function Home() {
           Gutenberga
         </h1>
         <p className="mt-6 text-white/70 text-lg leading-relaxed max-w-xs">
-          Dobrodružství mezi knihami.
+          Zažij dobrodružství mezi knihami.
         </p>
 
         {loading && (
@@ -122,7 +114,7 @@ export default function Home() {
         )}
       </section>
 
-      <section className="p-6 pb-8 flex flex-col gap-3">
+      <section className="p-15 pb-25 flex flex-col gap-5">
         <Button onClick={handleSolo} disabled={loading}>
           {loading ? "…" : "HRÁT"}
         </Button>

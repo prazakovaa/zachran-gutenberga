@@ -160,7 +160,7 @@ function GroupDetailModal({
                     </span>
                     {isPhoto && (
                       <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded-full">
-                        📷 foto
+                        Foto odpověď
                       </span>
                     )}
                   </div>
@@ -261,7 +261,7 @@ function GroupDetailModal({
                           }))}
                           className="bg-purple-600 hover:bg-purple-500 rounded-lg px-3 py-1.5 text-sm font-bold mt-2"
                         >
-                          ✏️ Zhodnotit
+                          Zhodnotit
                         </button>
                       )}
                     </div>
@@ -294,27 +294,71 @@ function QuestionsTab() {
 
   const handleSave = async () => {
     if (!editing) return;
+    const isPhoto = editing.answer_mode === "photo";
+    const orderNum = Number(editing.order_number);
+
+    // ── kontroly před uložením ──
+    if (!Number.isFinite(orderNum) || orderNum < 1) {
+      setMsg("Chyba: pořadí musí být celé číslo od 1 výš.");
+      return;
+    }
+    const collision = questions.find(
+      (q) => q.id !== editing.id && q.order_number === orderNum
+    );
+    if (collision) {
+      setMsg(`Chyba: pořadí ${orderNum} už používá otázka „${collision.question_text.slice(0, 40)}…". Zvol jiné číslo.`);
+      return;
+    }
+    if (!editing.qr_value.trim()) {
+      setMsg("Chyba: vyplň hodnotu QR kódu.");
+      return;
+    }
+    if (editing.is_fixed_first && editing.is_fixed_last) {
+      setMsg("Chyba: otázka nemůže být zároveň pevně první i pevně poslední.");
+      return;
+    }
+
     setSaving(true);
+
     const payload = {
-      order_number: editing.order_number,
-      teaser_text: editing.teaser_text,
-      detail_text: editing.detail_text,
+      order_number: orderNum,
+      legend_text: editing.legend_text ?? "",
       question_text: editing.question_text,
-      correct_answer: editing.correct_answer,
-      qr_value: editing.qr_value,
+      correct_answer: isPhoto ? "" : (editing.correct_answer ?? ""),
+      gutenberg_note: editing.gutenberg_note?.trim() ? editing.gutenberg_note : null,
+      qr_value: editing.qr_value.trim(),
       background_url: editing.background_url,
-      max_points: editing.max_points,
-      is_fixed_first: editing.is_fixed_first,
-      is_fixed_last: editing.is_fixed_last,
+      max_points: Number(editing.max_points) || 0,
+      is_fixed_first: !!editing.is_fixed_first,
+      is_fixed_last: !!editing.is_fixed_last,
       answer_mode: editing.answer_mode,
-      auto_grade: editing.answer_mode === "photo" ? false : editing.auto_grade,
+      auto_grade: isPhoto ? false : editing.auto_grade,
     };
+
+    // Pevně první / poslední smí být jen jedna otázka → ostatním to sebereme
+    // JEŠTĚ PŘED uložením (jinak by narazila unikátní podmínka v DB).
+    if (payload.is_fixed_first) {
+      await supabase.from("questions").update({ is_fixed_first: false }).eq("is_fixed_first", true);
+    }
+    if (payload.is_fixed_last) {
+      await supabase.from("questions").update({ is_fixed_last: false }).eq("is_fixed_last", true);
+    }
+
     const { error } = editing.id
       ? await supabase.from("questions").update(payload).eq("id", editing.id)
       : await supabase.from("questions").insert(payload);
 
     setSaving(false);
-    if (error) { setMsg("Chyba: " + error.message); return; }
+    if (error) {
+      const friendly = error.message.includes("order_number")
+        ? `Pořadí ${orderNum} už je obsazené jinou otázkou.`
+        : error.message.includes("qr_value")
+        ? `QR hodnota „${payload.qr_value}" už patří jiné otázce.`
+        : error.message;
+      setMsg("Chyba: " + friendly);
+      load();
+      return;
+    }
     setMsg("Uloženo ✓");
     setEditing(null);
     load();
@@ -327,35 +371,77 @@ function QuestionsTab() {
     load();
   };
 
+  // ── EDITOR OTÁZKY ────────────────────────────────────────────────────────
   if (editing !== null) {
     const isPhoto = editing.answer_mode === "photo";
-    const field = (key: keyof Question, label: string, multiline = false) => (
-      <div key={key} className="flex flex-col gap-1">
-        <label className="text-white/50 text-xs uppercase tracking-wider">{label}</label>
-        {multiline ? (
+    const others = questions.filter((q) => q.id !== editing.id);
+    const orderNum = Number(editing.order_number);
+    const orderCollision = others.find((q) => q.order_number === orderNum) ?? null;
+
+    const usedOrders = new Set(others.map((q) => q.order_number));
+    let freeOrder = 1;
+    while (usedOrders.has(freeOrder)) freeOrder++;
+
+    const otherFirst = others.find((q) => q.is_fixed_first) ?? null;
+    const otherLast = others.find((q) => q.is_fixed_last) ?? null;
+
+    const label = (text: string) => (
+      <label className="text-white/50 text-xs uppercase tracking-wider">{text}</label>
+    );
+
+    const field = (
+      key: keyof Question,
+      labelText: string,
+      opts: { multiline?: boolean; rows?: number; hint?: string; placeholder?: string } = {}
+    ) => (
+      <div key={String(key)} className="flex flex-col gap-1">
+        {label(labelText)}
+        {opts.multiline ? (
           <textarea
             value={String(editing[key] ?? "")}
             onChange={(e) => setEditing({ ...editing, [key]: e.target.value })}
-            rows={3}
-            className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white resize-none outline-none focus:border-white/50"
+            rows={opts.rows ?? 3}
+            placeholder={opts.placeholder}
+            className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white resize-y outline-none focus:border-white/50 placeholder:text-white/25"
           />
         ) : (
           <input
             value={String(editing[key] ?? "")}
             onChange={(e) => setEditing({ ...editing, [key]: e.target.value })}
-            className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white outline-none focus:border-white/50"
+            placeholder={opts.placeholder}
+            className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white outline-none focus:border-white/50 placeholder:text-white/25"
           />
         )}
+        {opts.hint && <p className="text-white/35 text-xs leading-relaxed">{opts.hint}</p>}
       </div>
+    );
+
+    const numberField = (key: "order_number" | "max_points", labelText: string) => (
+      <input
+        type="number"
+        min={key === "order_number" ? 1 : 0}
+        value={String(editing[key] ?? "")}
+        onChange={(e) =>
+          setEditing({ ...editing, [key]: e.target.value === "" ? 0 : parseInt(e.target.value, 10) })
+        }
+        aria-label={labelText}
+        className={`w-28 bg-white/10 border rounded-xl px-3 py-2 text-white outline-none ${
+          key === "order_number" && orderCollision
+            ? "border-orange-400 focus:border-orange-400"
+            : "border-white/20 focus:border-white/50"
+        }`}
+      />
     );
 
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => setEditing(null)} className="text-white/50 hover:text-white">
+          <button onClick={() => { setEditing(null); setMsg(""); }} className="text-white/50 hover:text-white">
             ← Zpět
           </button>
-          <h2 className="font-bold text-lg">{editing.id ? `Upravit otázku #${editing.order_number}` : "Nová otázka"}</h2>
+          <h2 className="font-bold text-lg">
+            {editing.id ? `Upravit otázku #${editing.order_number}` : "Nová otázka"}
+          </h2>
         </div>
 
         {/* Typ odpovědi */}
@@ -363,12 +449,12 @@ function QuestionsTab() {
           <p className="text-white/50 text-xs uppercase tracking-wider mb-2">Typ odpovědi</p>
           <div className="flex gap-2">
             <button
-              onClick={() => setEditing({ ...editing, answer_mode: "text" })}
+              onClick={() => setEditing({ ...editing, answer_mode: "text", auto_grade: true })}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold ${
                 !isPhoto ? "bg-blue-600 text-white" : "bg-white/10 text-white/60"
               }`}
             >
-              ✏️ Textová (auto bodování)
+              Textová odpověď
             </button>
             <button
               onClick={() => setEditing({ ...editing, answer_mode: "photo", auto_grade: false })}
@@ -376,56 +462,162 @@ function QuestionsTab() {
                 isPhoto ? "bg-purple-600 text-white" : "bg-white/10 text-white/60"
               }`}
             >
-              📷 Fotka (ruční hodnocení)
+              Foto odpověď
             </button>
+          </div>
+          <p className="text-white/35 text-xs mt-2">
+            {isPhoto
+              ? "Hráč nahraje fotku, slovní odpověď se nezadává. Body přiděluje admin ručně."
+              : "Hráč píše odpověď, hra ji porovná se správnou odpovědí a boduje automaticky."}
+          </p>
+        </div>
+
+        {/* Pořadí + vysvětlení */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-1">
+              {label("Pořadí")}
+              {numberField("order_number", "Pořadí")}
+            </div>
+            {orderCollision && (
+              <button
+                onClick={() => setEditing({ ...editing, order_number: freeOrder })}
+                className="bg-orange-500/20 hover:bg-orange-500/35 text-orange-200 rounded-xl px-3 py-2 text-sm mb-0"
+              >
+                Použít volné #{freeOrder}
+              </button>
+            )}
+          </div>
+
+          {orderCollision && (
+            <div className="bg-orange-500/15 border border-orange-400/40 rounded-xl px-3 py-2 text-orange-200 text-sm">
+              <strong>Pořadí {orderNum} je už obsazené.</strong> Používá ho otázka „
+              {orderCollision.question_text.slice(0, 60)}
+              {orderCollision.question_text.length > 60 ? "…" : ""}". Každé číslo smí patřit
+              jen jedné otázce — jinak se otázka neuloží.
+            </div>
+          )}
+
+          <div className="bg-blue-500/10 border border-blue-400/25 rounded-xl px-3 py-2 text-blue-100/80 text-xs leading-relaxed">
+            <p className="font-semibold text-blue-100 mb-1">Jak pořadí funguje</p>
+            Číslo určuje, jak otázky <strong>navazují v řadě</strong> — sedmička jde vždy za
+            šestkou a před osmičkou. Neurčuje ale, kolikátá se hráči zobrazí: každá skupina
+            začíná na jiné otázce z řady a pokračuje dokola.
+            <br />
+            Pevné místo mají jen otázky označené <em>pevně první</em> a <em>pevně poslední</em>.
+            <br />
+            <span className="text-blue-200/60">
+              Např.: skupina A → 1, 5, 6, 7, 8, 9, 2, 3, 4, 10 · skupina B → 1, 3, 4, 5, 6, 7, 8, 9, 2, 10
+            </span>
+            <br />
+            <strong>Každé číslo použij jen jednou</strong> — obsazené je: {" "}
+            {others.length
+              ? others.map((q) => q.order_number).sort((a, b) => a - b).join(", ")
+              : "zatím nic"}.
           </div>
         </div>
 
-        {field("order_number", "Pořadí")}
-        {field("teaser_text", "Teaser text", true)}
-        {field("detail_text", "Detail text", true)}
-        {field("question_text", isPhoto ? "Instrukce (co mají vyfotit)" : "Otázka", true)}
+        {field("legend_text", "Legenda", {
+          multiline: true,
+          rows: 6,
+          hint: "Úvod i doplňující text dohromady. Odstavce odděl prázdným řádkem.",
+          placeholder: "Pan Gutenberg vchází do čítárny…\n\nNa stole leží výtisky denního tisku.",
+        })}
 
-        {!isPhoto && field("correct_answer", "Správná odpověď (lowercase)")}
+        {field("question_text", isPhoto ? "Znění úkolu (co mají vyfotit)" : "Znění otázky", {
+          multiline: true,
+          rows: 3,
+        })}
+
+        {!isPhoto &&
+          field("correct_answer", "Správná odpověď", {
+            hint: "Porovnává se bez ohledu na velká/malá písmena a mezery na krajích.",
+          })}
+
         {isPhoto && (
           <div className="bg-purple-600/10 border border-purple-500/30 rounded-xl px-3 py-2 text-purple-200 text-sm">
-            ℹ️ Tato otázka se neboduje automaticky. Body přidělí admin ručně po zhlédnutí fotek.
+            U foto odpovědi se správná odpověď nezadává — body přidělí admin ručně po zhlédnutí fotek.
           </div>
         )}
 
-        {field("qr_value", "QR kód hodnota (např. q1)")}
-        {field("background_url", "URL obrázku (volitelné)")}
-        {field("max_points", isPhoto ? "Max bodů (kolik může admin dát)" : "Max bodů")}
+        {field("gutenberg_note", "Gutenbergova poznámka", {
+          multiline: true,
+          rows: 3,
+          hint: "Komentář postavy, která hráče provází. Volitelné — když necháš prázdné, nezobrazí se.",
+          placeholder: "Zprávy tištěné každý den? To je rychlost, jakou jsem si neuměl představit.",
+        })}
 
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 text-white/70">
-            <input
-              type="checkbox"
-              checked={!!editing.is_fixed_first}
-              onChange={(e) => setEditing({ ...editing, is_fixed_first: e.target.checked })}
-            />
-            Pevně první
-          </label>
-          <label className="flex items-center gap-2 text-white/70">
-            <input
-              type="checkbox"
-              checked={!!editing.is_fixed_last}
-              onChange={(e) => setEditing({ ...editing, is_fixed_last: e.target.checked })}
-            />
-            Pevně poslední
-          </label>
+        {field("qr_value", "QR kód hodnota", { placeholder: "např. q1" })}
+        {field("background_url", "URL obrázku (volitelné)")}
+
+        <div className="flex flex-col gap-1">
+          {label(isPhoto ? "Max bodů (kolik může admin dát)" : "Max bodů")}
+          {numberField("max_points", "Max bodů")}
         </div>
 
-        {msg && <p className="text-green-400 text-sm">{msg}</p>}
+        {/* Pevné pozice */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+          <p className="text-white/50 text-xs uppercase tracking-wider">Pevná pozice</p>
+          <div className="flex gap-4 flex-wrap">
+            <label className="flex items-center gap-2 text-white/70">
+              <input
+                type="checkbox"
+                checked={!!editing.is_fixed_first}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    is_fixed_first: e.target.checked,
+                    is_fixed_last: e.target.checked ? false : editing.is_fixed_last,
+                  })
+                }
+              />
+              Pevně první
+            </label>
+            <label className="flex items-center gap-2 text-white/70">
+              <input
+                type="checkbox"
+                checked={!!editing.is_fixed_last}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    is_fixed_last: e.target.checked,
+                    is_fixed_first: e.target.checked ? false : editing.is_fixed_first,
+                  })
+                }
+              />
+              Pevně poslední
+            </label>
+          </div>
+          <p className="text-white/35 text-xs">
+            Jedna otázka může být buď první, nebo poslední — ne obojí. Obojí smí být označená
+            vždy jen jedna otázka z celé hry.
+          </p>
+          {editing.is_fixed_first && otherFirst && (
+            <p className="text-orange-300 text-xs">
+              Pevně první je teď otázka #{otherFirst.order_number} — po uložení jí to označení sebereme.
+            </p>
+          )}
+          {editing.is_fixed_last && otherLast && (
+            <p className="text-orange-300 text-xs">
+              Pevně poslední je teď otázka #{otherLast.order_number} — po uložení jí to označení sebereme.
+            </p>
+          )}
+        </div>
+
+        {msg && (
+          <p className={msg.startsWith("Chyba") ? "text-red-400 text-sm" : "text-green-400 text-sm"}>
+            {msg}
+          </p>
+        )}
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            disabled={saving}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 rounded-xl py-2 font-bold"
+            disabled={saving || !!orderCollision}
+            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-white/10 disabled:text-white/30 rounded-xl py-2 font-bold"
           >
             {saving ? "Ukládám…" : "Uložit"}
           </button>
-          <button onClick={() => setEditing(null)} className="flex-1 bg-white/10 rounded-xl py-2">
+          <button onClick={() => { setEditing(null); setMsg(""); }} className="flex-1 bg-white/10 rounded-xl py-2">
             Zrušit
           </button>
         </div>
@@ -433,14 +625,29 @@ function QuestionsTab() {
     );
   }
 
+  // ── SEZNAM OTÁZEK ────────────────────────────────────────────────────────
+  const orderCounts = new Map<number, number>();
+  questions.forEach((q) => orderCounts.set(q.order_number, (orderCounts.get(q.order_number) ?? 0) + 1));
+  const duplicateOrders = [...orderCounts.entries()].filter(([, n]) => n > 1).map(([n]) => n);
+  const firstCount = questions.filter((q) => q.is_fixed_first).length;
+  const lastCount = questions.filter((q) => q.is_fixed_last).length;
+
+  const nextFreeOrder = () => {
+    const used = new Set(questions.map((q) => q.order_number));
+    let n = 1;
+    while (used.has(n)) n++;
+    return n;
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="font-bold text-lg">Otázky ({questions.length})</h2>
         <button
           onClick={() => setEditing({
-            id: 0, order_number: questions.length + 1, teaser_text: "", detail_text: "",
-            question_text: "", correct_answer: "", qr_value: "", background_url: null,
+            id: 0, order_number: nextFreeOrder(), legend_text: "",
+            question_text: "", correct_answer: "", gutenberg_note: "",
+            qr_value: "", background_url: null,
             max_points: 10, is_fixed_first: false, is_fixed_last: false,
             answer_mode: "text", auto_grade: true,
           })}
@@ -449,31 +656,58 @@ function QuestionsTab() {
           + Nová otázka
         </button>
       </div>
-      {msg && <p className="text-green-400 text-sm">{msg}</p>}
+
+      {duplicateOrders.length > 0 && (
+        <div className="bg-orange-500/15 border border-orange-400/40 rounded-xl px-4 py-3 text-orange-200 text-sm">
+          Pozor: pořadí {duplicateOrders.join(", ")} používá víc otázek najednou. Uprav je, ať má
+          každá otázka své vlastní číslo.
+        </div>
+      )}
+      {firstCount !== 1 && questions.length > 0 && (
+        <div className="bg-orange-500/15 border border-orange-400/40 rounded-xl px-4 py-3 text-orange-200 text-sm">
+          {firstCount === 0
+            ? "Žádná otázka není označená jako pevně první — hra začne náhodnou otázkou."
+            : `Pevně první je označeno ${firstCount} otázek. Nech označenou jen jednu.`}
+        </div>
+      )}
+      {lastCount !== 1 && questions.length > 0 && (
+        <div className="bg-orange-500/15 border border-orange-400/40 rounded-xl px-4 py-3 text-orange-200 text-sm">
+          {lastCount === 0
+            ? "Žádná otázka není označená jako pevně poslední — hra skončí náhodnou otázkou."
+            : `Pevně poslední je označeno ${lastCount} otázek. Nech označenou jen jednu.`}
+        </div>
+      )}
+
+      {msg && <p className={msg.startsWith("Chyba") ? "text-red-400 text-sm" : "text-green-400 text-sm"}>{msg}</p>}
+
       {questions.map((q) => {
         const isPhoto = q.answer_mode === "photo";
+        const meta = [
+          !isPhoto && q.correct_answer ? `Odpověď: ${q.correct_answer}` : null,
+          `${q.max_points} bodů`,
+          `QR: ${q.qr_value}`,
+          q.is_fixed_first ? "vždy první" : null,
+          q.is_fixed_last ? "vždy poslední" : null,
+        ].filter(Boolean).join(" · ");
+
         return (
           <div key={q.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="bg-blue-600/50 text-xs px-2 py-0.5 rounded-full">#{q.order_number}</span>
-                <span className="text-white/40 text-xs font-mono">{q.qr_value}</span>
+                <span className="bg-blue-600/50 text-xs px-2 py-0.5 rounded-full font-mono">
+                  #{q.order_number}
+                </span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   isPhoto ? "bg-purple-600/30 text-purple-300" : "bg-green-600/30 text-green-400"
                 }`}>
-                  {isPhoto ? "📷 foto" : "✏️ text"}
+                  {isPhoto ? "Foto odpověď" : "Textová odpověď"}
                 </span>
-                {q.is_fixed_first && <span className="text-xs bg-green-600/30 text-green-400 px-2 py-0.5 rounded-full">1.</span>}
-                {q.is_fixed_last && <span className="text-xs bg-red-600/30 text-red-400 px-2 py-0.5 rounded-full">poslední</span>}
               </div>
               <p className="text-white/80 text-sm truncate">{q.question_text}</p>
-              <p className="text-white/40 text-xs mt-0.5">
-                {isPhoto ? "Max " : "Odpověď: " + q.correct_answer + " · "}
-                {q.max_points} bodů
-              </p>
+              <p className="text-white/40 text-xs mt-0.5">{meta}</p>
             </div>
             <div className="flex flex-col gap-1 shrink-0">
-              <button onClick={() => setEditing(q)} className="bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 text-sm">
+              <button onClick={() => { setMsg(""); setEditing(q); }} className="bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 text-sm">
                 Upravit
               </button>
               <QuestionQRDownload qrValue={q.qr_value} origin={origin} />
@@ -484,7 +718,7 @@ function QuestionsTab() {
                   rel="noopener"
                   className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 rounded-lg px-3 py-1.5 text-sm text-center"
                 >
-                  🖼️ Fotogalerie
+                  Fotogalerie
                 </a>
               )}
               <button onClick={() => handleDelete(q.id)} className="bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg px-3 py-1.5 text-sm">
@@ -686,7 +920,7 @@ function ClassesTab() {
                           rel="noopener"
                           className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 rounded-lg px-3 py-1.5 text-sm"
                         >
-                          📺 Prezentace {q.order_number}. otázky
+                          Prezentace · otázka #{q.order_number}
                         </a>
                       ))}
                   </div>
