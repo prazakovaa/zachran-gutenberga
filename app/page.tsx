@@ -41,7 +41,6 @@ export default function Home() {
     setLoading(true);
     setStatus("Připravujeme tvé jméno…");
 
-    // 1) Najdi volné jméno (max 20 pokusů, pak přidej číslo)
     let name = "";
     for (let attempt = 0; attempt < 20; attempt++) {
       const candidate = genName();
@@ -59,7 +58,6 @@ export default function Home() {
 
     setStatus("Vytváříme tvou hru…");
 
-    // 2) Vytvoř sólo skupinu v DB
     const order = await generateQuestionOrder();
     const { data: group, error } = await supabase
       .from("groups")
@@ -79,7 +77,6 @@ export default function Home() {
       return;
     }
 
-    // 3) Nastav session
     setSession({
       mode: "solo",
       groupId: group.id,
@@ -89,7 +86,6 @@ export default function Home() {
       currentQuestionIndex: 0,
     });
 
-    // 4) Přesměruj na úvod hry
     router.push("/intro");
   };
 

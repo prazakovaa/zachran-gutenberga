@@ -184,8 +184,10 @@ export default function QuestionPage({
 
   const currentPoints = useCallback(() => {
     if (!question) return 0;
-    const lost = attempts * Math.floor(question.max_points / MAX_ATTEMPTS);
-    return Math.max(1, question.max_points - lost);
+    // max_points je v databázi nullable → sjednotíme na číslo na jednom místě
+    const max = question.max_points ?? 0;
+    const lost = attempts * Math.floor(max / MAX_ATTEMPTS);
+    return Math.max(1, max - lost);
   }, [question, attempts]);
 
   // Z "https://www.zachrangutenberga.cz/q5" vytáhne "q5"
@@ -340,7 +342,7 @@ export default function QuestionPage({
           <p className="text-white/60">Jdi hledat jinam – správný QR kód tě pustí dál.</p>
           <button
             onClick={() => setPhase("teaser")}
-            className="bg-white text-[#363B60] rounded-2xl px-6 py-3 font-bold"
+            className="bg-white text-[#0B5ED7] rounded-2xl px-6 py-3 font-bold"
           >
             Zkusit znovu
           </button>
@@ -395,7 +397,7 @@ export default function QuestionPage({
                   {session?.mode === "solo" && (question.max_points ?? 0) > 0 && (
                     <>
                       <br />
-                      Získáváš <span className="text-white font-bold">{question.max_points} bodů</span>
+                      Získáváš <span className="text-white font-bold">{question.max_points ?? 0} bodů</span>
                     </>
                   )}
                 </>
@@ -406,7 +408,7 @@ export default function QuestionPage({
           </div>
           <button
             onClick={handleContinue}
-            className="mt-4 w-full bg-white text-[#363B60] rounded-3xl font-black text-xl py-5 shadow-xl"
+            className="mt-4 w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl"
           >
             DALŠÍ STANOVIŠTĚ →
           </button>
@@ -456,7 +458,7 @@ export default function QuestionPage({
                   <button
                     onClick={handlePhotoSubmit}
                     disabled={uploadingPhoto}
-                    className="flex-1 bg-white text-[#363B60] rounded-2xl font-black py-3 disabled:opacity-40"
+                    className="flex-1 bg-white text-[#0B5ED7] rounded-2xl font-black py-3 disabled:opacity-40"
                   >
                     {uploadingPhoto ? "Odesílám…" : "ODESLAT"}
                   </button>
@@ -465,7 +467,7 @@ export default function QuestionPage({
             ) : (
               <label className="block">
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
-                <div className="w-full bg-white text-[#363B60] rounded-3xl font-black text-xl py-5 shadow-xl text-center cursor-pointer">
+                <div className="w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl text-center cursor-pointer">
                   📷 VYFOTIT
                 </div>
               </label>
@@ -485,7 +487,7 @@ export default function QuestionPage({
     return (
       <MobileContainer>
         <div className="flex items-center justify-between px-4 pt-4">
-          <PointsBadge points={currentPoints()} max={question.max_points} />
+          <PointsBadge points={currentPoints()} max={question.max_points ?? 0} />
         </div>
 
         <div className="flex-1 flex flex-col px-6 pt-6 gap-4">
@@ -518,7 +520,7 @@ export default function QuestionPage({
             <button
               onClick={handleSubmitAnswer}
               disabled={!answer.trim() || submitting || isOutOfAttempts}
-              className="bg-white text-[#363B60] rounded-2xl px-5 font-bold disabled:opacity-40"
+              className="bg-white text-[#0B5ED7] rounded-2xl px-5 font-bold disabled:opacity-40"
             >
               →
             </button>
@@ -564,7 +566,7 @@ export default function QuestionPage({
           <div className="w-full h-52 relative overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={question.background_url} alt="Stanoviště" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#363B60]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0B5ED7]" />
           </div>
         )}
 

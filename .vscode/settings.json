@@ -1,0 +1,13 @@
+{
+  // Tailwind v4 používá @theme, @utility a @apply – vestavěný CSS validátor
+  // je nezná a hlásil by je jako chybu.
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  }
+}

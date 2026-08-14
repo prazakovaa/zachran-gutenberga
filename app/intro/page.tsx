@@ -4,30 +4,42 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MobileContainer from "@/components/layout/MobileContainer";
 import TypeWriter from "./components/TypeWriter";
-import BooksAnim from "./components/slides/BooksAnim";
+import SceneArt from "@/components/layout/SceneArt";
 import { SLIDES } from "./slides";
+
+/* Délky přechodu mezi slidy (ms). */
+const FLASH_OUT = 420;   // jak dlouho trvá prolnutí do barvy
+const FLASH_HOLD = 140;  // jak dlouho barva drží, než se odkryje nový slide
+const FLASH_IN = 520;    // jak dlouho trvá odkrytí nového slidu
+const NO_FLASH_OUT = 250;
 
 export default function IntroPage() {
   const router = useRouter();
   const [current, setCurrent] = useState(0);
   const [locked, setLocked] = useState(true);
   const [textDone, setTextDone] = useState(false);
-  const [exiting, setExiting] = useState(false);
+  /* true = obraz je překrytý barvou. Startuje zapnuté, takže se intro
+     otevře odkrytím z černé místo tvrdého naskočení. */
+  const [exiting, setExiting] = useState(true);
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const slide = SLIDES[current];
   const isLast = current === SLIDES.length - 1;
+  const flash = slide.flash ?? "none";
 
   useEffect(() => {
     setLocked(true);
     setTextDone(false);
-    setExiting(false);
+
+    // Barva chvíli podrží, aby nový slide stihl doběhnout, teprve pak odkryjeme.
+    const revealTimer = setTimeout(() => setExiting(false), FLASH_HOLD);
 
     lockTimer.current = setTimeout(() => {
       setLocked(false);
     }, slide.lockSeconds * 1000);
 
     return () => {
+      clearTimeout(revealTimer);
       if (lockTimer.current) clearTimeout(lockTimer.current);
     };
   }, [current, slide.lockSeconds]);
@@ -36,21 +48,32 @@ export default function IntroPage() {
     if (locked || !textDone) return;
 
     setExiting(true);
-    setTimeout(() => {
-      if (isLast) {
-        router.push("/story");
-      } else {
-        setCurrent((c) => c + 1);
-      }
-    }, 350);
-  }, [locked, textDone, isLast, router]);
+    setTimeout(
+      () => {
+        if (isLast) {
+          router.push("/story");
+        } else {
+          setCurrent((c) => c + 1);
+        }
+      },
+      flash === "none" ? NO_FLASH_OUT : FLASH_OUT
+    );
+  }, [locked, textDone, isLast, router, flash]);
 
   const handleTextDone = useCallback(() => {
     setTextDone(true);
   }, []);
 
   return (
-    <MobileContainer>
+    <MobileContainer
+      bg={slide.bg}
+      bgOpacity={slide.bgOpacity ?? 100}
+      scrim={slide.scrim ?? "soft"}
+      priority
+      overlay={<SceneArt items={slide.art?.filter((a) => !a.behindScrim)} />}
+      overlayBehind={<SceneArt items={slide.art?.filter((a) => a.behindScrim)} />}
+      preload={SLIDES.map((s) => s.bg)}
+    >
       <div className="flex-1 flex flex-col select-none" onClick={advance}>
 
         <div className="flex justify-center gap-2 pt-6 pb-2">
@@ -68,15 +91,9 @@ export default function IntroPage() {
           ))}
         </div>
 
-        <div
-          className={`flex-1 flex items-center justify-center px-4 transition-opacity duration-300 ${
-            exiting ? "opacity-0" : "opacity-100"
-          }`}
-        >
-          <div className="w-full max-w-[280px] aspect-square">
-            <BooksAnim variant={slide.variant} />
-          </div>
-        </div>
+        {/* Ilustrace slidu žijí ve vrstvě nad fotkou (viz overlay výše),
+            tady zůstává jen volné místo, aby text zůstal dole. */}
+        <div className="flex-1" />
 
         <div
           className={`px-6 pb-10 min-h-[160px] flex flex-col justify-end transition-opacity duration-300 ${
@@ -126,6 +143,21 @@ export default function IntroPage() {
             </div>
           )}
         </div>
+
+        {/* Přechodová clona přes celou obrazovku – překryje i text a ovládání. */}
+        {flash !== "none" && (
+          <div
+            aria-hidden="true"
+            className={`fixed inset-0 z-50 pointer-events-none ${
+              flash === "white" ? "bg-white" : "bg-black"
+            } ${exiting ? "opacity-100" : "opacity-0"}`}
+            style={{
+              transitionProperty: "opacity",
+              transitionTimingFunction: "ease-in-out",
+              transitionDuration: `${exiting ? FLASH_OUT : FLASH_IN}ms`,
+            }}
+          />
+        )}
       </div>
     </MobileContainer>
   );

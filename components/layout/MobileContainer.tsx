@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-type Scrim = "none" | "full" | "bottom" | "top" | "both";
+type Scrim = "none" | "soft" | "full" | "bottom" | "top" | "both";
 
 type Props = {
   children: React.ReactNode;
@@ -15,8 +15,13 @@ type Props = {
   bgOpacity?: number;
   /** Ztmavení fotky, aby byl text čitelný. Výchozí "bottom". */
   scrim?: Scrim;
-  /** Vrstva přes fotku – SVG, PNG, animace. Neklikatelná. */
+  /** Poměr stran fotek na pozadí. Musí sedět s reálným poměrem souborů,
+   *  jinak by se SVG vrstva vůči fotce posouvala. */
+  bgRatio?: string;
+  /** Vrstva ukotvená k fotce, NAD scrimem – ztmavení se jí netýká. */
   overlay?: React.ReactNode;
+  /** Vrstva ukotvená k fotce, POD scrimem – ztmaví se spolu s fotkou. */
+  overlayBehind?: React.ReactNode;
   /** Fotka na první obrazovce → načíst přednostně. */
   priority?: boolean;
   /** Fotky, které přijdou na řadu za chvíli – načtou se dopředu, ať sekvence neproblikne. */
@@ -25,6 +30,7 @@ type Props = {
 
 const SCRIMS: Record<Scrim, string> = {
   none: "",
+  soft: "bg-ink/30",
   full: "bg-ink/55",
   bottom: "bg-gradient-to-b from-ink/25 via-ink/45 to-ink/95",
   top: "bg-gradient-to-t from-ink/25 via-ink/45 to-ink/95",
@@ -36,8 +42,10 @@ export default function MobileContainer({
   bg,
   bgAlt = "",
   bgOpacity = 100,
+  bgRatio = "1 / 2",
   scrim = "bottom",
   overlay,
+  overlayBehind,
   priority = false,
   preload = [],
 }: Props) {
@@ -62,39 +70,60 @@ export default function MobileContainer({
     return () => clearTimeout(t);
   }, [bg]);
 
+  /* Stránky často opakují stejnou fotku – duplicity zahodíme a aktuální
+     fotku předem tahat nemusíme, tu už kontejner vykresluje. */
+  const preloadList = Array.from(new Set(preload)).filter((src) => src !== bg);
+
   return (
     /* Vnější vrstva drží fotku – roztažená přes celou šířku okna.
        Vnitřní sloupec drží obsah – vždy uprostřed, max-w-md. */
     <div className="relative min-h-screen w-full bg-ink text-paper flex justify-center overflow-hidden">
-      {layers.length > 0 && (
-        <div className="absolute inset-0 z-0" aria-hidden={bgAlt ? undefined : true}>
-          {layers.map((layer, i) => {
-            const isTop = i === layers.length - 1;
-            return (
-              <div
-                key={layer.key}
-                className={`absolute inset-0 ${isTop ? "animate-fade-in" : ""}`}
-              >
-                <Image
-                  src={layer.src}
-                  alt={isTop ? bgAlt : ""}
-                  fill
-                  priority={priority && layer.key === 0}
-                  sizes="100vw"
-                  className="object-cover"
-                  style={{ opacity: bgOpacity / 100 }}
-                />
-              </div>
-            );
-          })}
+      {(layers.length > 0 || overlay || overlayBehind) && (
+        <div className="absolute inset-0 z-0 overflow-hidden" aria-hidden={bgAlt ? undefined : true}>
+          {/* SCÉNA: box s poměrem stran fotky, zvětšený tak, aby pokryl okno.
+              Fotka i SVG vrstvy žijí uvnitř, takže % souřadnice odkazují
+              vždy na stejné místo fotky – na mobilu i na desktopu. */}
+          <Stage ratio={bgRatio}>
+            {layers.map((layer, i) => {
+              const isTop = i === layers.length - 1;
+              return (
+                <div
+                  key={layer.key}
+                  className={`absolute inset-0 ${isTop ? "animate-fade-in" : ""}`}
+                >
+                  <Image
+                    src={layer.src}
+                    alt={isTop ? bgAlt : ""}
+                    fill
+                    priority={priority && layer.key === 0}
+                    sizes="100vw"
+                    className="object-cover"
+                    style={{ opacity: bgOpacity / 100 }}
+                  />
+                </div>
+              );
+            })}
 
+            {/* Vrstva, která má zapadnout do fotky → ztmaví se s ní. */}
+            {overlayBehind && (
+              <div className="absolute inset-0 pointer-events-none">{overlayBehind}</div>
+            )}
+          </Stage>
+
+          {/* Scrim leží přes celé okno, ne jen přes scénu. */}
           {scrim !== "none" && <div className={`absolute inset-0 ${SCRIMS[scrim]}`} />}
-          {overlay && <div className="absolute inset-0 pointer-events-none">{overlay}</div>}
+
+          {/* Druhá scéna nad scrimem – stejná souřadná soustava, ale plné barvy. */}
+          {overlay && (
+            <Stage ratio={bgRatio}>
+              <div className="absolute inset-0 pointer-events-none">{overlay}</div>
+            </Stage>
+          )}
         </div>
       )}
 
       {/* Předem natažené fotky pro další obrazovky – nejsou vidět. */}
-      {preload.map((src) => (
+      {preloadList.map((src) => (
         <Image
           key={src}
           src={src}
@@ -110,6 +139,19 @@ export default function MobileContainer({
       <div className="relative z-10 w-full max-w-md min-h-screen flex flex-col">
         {children}
       </div>
+    </div>
+  );
+}
+
+/** Box s pevným poměrem stran, zvětšený tak, aby pokryl okno.
+    Díky němu odkazují % souřadnice uvnitř vždy na stejné místo fotky. */
+function Stage({ ratio, children }: { ratio: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full"
+      style={{ aspectRatio: ratio }}
+    >
+      {children}
     </div>
   );
 }

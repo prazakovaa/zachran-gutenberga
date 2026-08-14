@@ -2,7 +2,6 @@ type Props = {
   variant?: 1 | 2 | 3 | 4 | 5;
 };
 
-// Each variant shifts book positions/colors slightly so slides feel distinct
 const CONFIGS = {
   1: {
     books: [

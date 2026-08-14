@@ -135,18 +135,16 @@ export default function ProfilePage() {
     <MobileContainer>
       <div className="flex items-center justify-between px-4 pt-4">
         <button onClick={() => router.back()} className="text-white/60 text-sm">← Zpět</button>
-        <h1 className="font-bold text-lg">Profil</h1>
+        <h2 className="font-bold text-lg">Profil</h2>
         <div className="w-12" />
       </div>
 
       <div className="flex-1 px-6 pt-6 flex flex-col gap-6">
-        {/* avatar + jméno */}
         <div className="flex flex-col items-center gap-3">
           {authUser?.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={authUser.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-white/20" />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-white/10 border-4 border-white/20 flex items-center justify-center text-4xl">
+            <div className="w-18 h-18 rounded-full bg-white/10 border-4 border-white/20 flex items-center justify-center text-4xl">
               {session.mode === "solo" ? "🎲" : "👥"}
             </div>
           )}
@@ -164,7 +162,7 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-extrabold">{session.groupName}</h2>
+              <h3 className="text-2xl font-extrabold">{session.groupName}</h3>
               {session.mode === "solo" && (
                 <button
                   onClick={() => setEditing(true)}

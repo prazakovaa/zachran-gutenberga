@@ -40,7 +40,6 @@ function JoinContent() {
       setAutoFilled(true);
       handlePinChange(urlPin);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const handleJoin = async () => {
@@ -77,7 +76,7 @@ function JoinContent() {
   const pinValid = classId !== null;
 
   return (
-    <MobileContainer>
+    <MobileContainer bg="/backgrounds/bg1.webp" bgOpacity={10}>
       <section className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
         <h1 className="text-3xl font-extrabold text-center mb-2">Zadej PIN třídy</h1>
 
@@ -97,12 +96,13 @@ function JoinContent() {
           {checkingPin && (
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 text-sm animate-pulse">…</span>
           )}
+          <p className="text-white/50 text-sm mt-3">PIN ti sdělí tvůj vyučující nebo průvodce.</p>
         </div>
 
         {error && <p className="text-red-300 text-sm font-medium">{error}</p>}
 
         {autoFilled && pinValid && (
-          <p className="text-green-300 text-sm font-medium">✓ PIN načten z QR kódu</p>
+          <p className="text-green-300 text-sm font-medium">PIN načten z QR kódu</p>
         )}
 
         <div className={`w-full overflow-hidden transition-all duration-300 ease-in-out ${
@@ -116,7 +116,7 @@ function JoinContent() {
             className="w-full text-center text-2xl font-semibold
                        bg-white/10 border-2 border-white rounded-2xl py-4 text-white
                        placeholder:text-white/40 outline-none mt-1"
-            placeholder="Název skupiny"
+            placeholder="Přezdívka skupiny"
             autoFocus={pinValid}
           />
         </div>
@@ -127,7 +127,7 @@ function JoinContent() {
           {loading ? "Připojování…" : "ZAČÍT HRÁT"}
         </Button>
         <Button variant="secondary" onClick={() => router.push("/")}>
-          ← Zpět na výběr
+          Zpět
         </Button>
       </section>
     </MobileContainer>

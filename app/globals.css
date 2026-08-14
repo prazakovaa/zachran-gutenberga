@@ -1,17 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Rubik+Scribble&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Amiko:wght@400;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Amiko:wght@400;600;700&family=Catamaran:wght@100..900&display=swap');
 @import "tailwindcss";
+
 /* ══════════════════════════════════════════════════════════════════
    IDENTITA APLIKACE — tady se mění vzhled celé hry.
    Změníš hex a propíše se to všude (bg-ink, text-gold, border-paper…).
    ══════════════════════════════════════════════════════════════════ */
 @theme {
-  --color-dark: #312B2B;     /* nejtmavší  */
-  --color-paper: #EEEEEE;      /* nejsvětlejší */
-  --color-yellow: #FBD24D;      /*  zvýraznění, pozor je světlá!! */
-  --color-ink: #363B60;        /*  tmavá barevná barva */
+  /* Barvy */
+  --color-ink: #0a1a2f;        /* nejtmavší – základ pod fotkou */
+  --color-ink-soft: #16304f;   /* karty, lišty */
+  --color-paper: #f6f1e6;      /* text, primární tlačítko */
+  --color-gold: #e0a83c;       /* akcent – zvýraznění, Gutenbergova poznámka */
+  --color-gold-deep: #a9741a;  /* akcent tmavší (hover, stíny) */
 
+  /* Písma — konkrétní fonty načítá next/font v app/layout.tsx */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-body: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+
+  /* Zaoblení */
   --radius-card: 1.25rem;
   --radius-btn: 1.75rem;
 }
@@ -21,14 +26,16 @@
 }
 
 body {
-  background: var(--color-dark);
+  background: var(--color-ink);
   color: var(--color-paper);
-  font-family: "Amiko", sans-serif;
+  font-family: var(--font-body);
+  /* fotka na pozadí nemá při přetažení odhalit bílou plochu */
   overscroll-behavior-y: none;
 }
 
+/* Nadpisy — jedno místo pro celou aplikaci */
 h1, h2, h3 {
-  font-family: "Amiko", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -36,10 +43,10 @@ h1, h2, h3 {
 
 h1 {
   font-size: clamp(2.5rem, 12vw, 3.5rem);
-  line-height: 1.2;
-  font-family: "Rubik Scribble", system-ui;
+  line-height: 1.02;
 }
 
+/* Text ležící přímo na fotce potřebuje vlastní čitelnost */
 .on-photo {
   text-shadow: 0 2px 12px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.4);
 }
@@ -50,9 +57,24 @@ h1 {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @keyframes drift {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50%      { transform: translateY(-10px) rotate(-1.2deg); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%      { transform: rotate(2.5deg); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
 }
 
 @keyframes glow-pulse {
@@ -60,10 +82,14 @@ h1 {
   50%      { opacity: 0.7; }
 }
 
-.animate-rise  { animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.animate-drift { animation: drift 7s ease-in-out infinite; }
+.animate-rise    { animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.animate-fade-in { animation: fade-in 0.6s ease-out both; }
+.animate-drift   { animation: drift 7s ease-in-out infinite; }
+.animate-sway    { animation: sway 6s ease-in-out infinite; }
+.animate-breathe { animation: breathe 5s ease-in-out infinite; }
 .animate-glow  { animation: glow-pulse 4s ease-in-out infinite; }
 
+/* Postupné nabíhání prvků po načtení stránky */
 .delay-1 { animation-delay: 0.10s; }
 .delay-2 { animation-delay: 0.22s; }
 .delay-3 { animation-delay: 0.36s; }
@@ -71,7 +97,10 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
+  .animate-fade-in,
   .animate-drift,
+  .animate-sway,
+  .animate-breathe,
   .animate-glow {
     animation: none !important;
     opacity: 1 !important;
