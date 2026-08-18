@@ -4,6 +4,7 @@ import { use, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MobileContainer from "@/components/layout/MobileContainer";
 import BottomNav from "@/components/layout/BottomNav";
+import { isAnswerCorrect, primaryAnswer } from "@/lib/answerCheck";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 import type { Database } from "@/types/database";
@@ -119,18 +120,49 @@ function PointsBadge({ points, max }: { points: number; max: number }) {
   );
 }
 
-// ─── Gutenbergova poznámka ────────────────────────────────────────────────────
-function GutenbergNote({ text }: { text: string }) {
+// ─── Legenda v béžové kartě ───────────────────────────────────────────────────
+function LegendCard({ text }: { text: string }) {
   return (
-    <div className="flex gap-3 items-start bg-amber-200/10 border border-amber-200/25 rounded-2xl p-4">
-      <div className="w-9 h-9 rounded-full bg-amber-200/20 flex items-center justify-center shrink-0 text-lg">
-        🖋️
+    <div className="relative bg-paper text-ink px-4 py-4 pr-11 shadow-xl shadow-ink/40">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/detail/legenda.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute -top-4 -right-3 w-14 h-14 object-contain drop-shadow-md"
+      />
+      <p className="text-[15px] leading-relaxed whitespace-pre-line">{text}</p>
+    </div>
+  );
+}
+
+// ─── Bublina s textem + postava Gutenberga u okraje ──────────────────────────
+function GutenbergHint({ text, side }: { text: string; side: "left" | "right" }) {
+  const isLeft = side === "left";
+
+  return (
+    /* -mx-5 ruší vodorovný padding stránky, aby postava mohla dosáhnout
+       až na okraj displeje a zanořit se do něj. */
+    <div className={`-mx-5 flex flex-col ${isLeft ? "items-start" : "items-end"}`}>
+      <div className="relative mx-5 max-w-[85%] bg-ink-soft/90 backdrop-blur-sm text-paper rounded-3xl px-4 py-3 shadow-lg shadow-ink/50">
+        <p className="text-[15px] leading-relaxed text-center whitespace-pre-line">{text}</p>
+        {/* ocásek bubliny mířící dolů k postavě */}
+        <div
+          className={`absolute -bottom-2 ${isLeft ? "left-10" : "right-10"} w-5 h-5 bg-ink-soft/90 rotate-45 rounded-sm`}
+        />
       </div>
-      <div className="min-w-0">
-        <p className="text-amber-200/80 text-xs font-semibold uppercase tracking-wider mb-1">
-          Gutenbergova poznámka
-        </p>
-        <p className="text-white/90 leading-relaxed italic whitespace-pre-line">{text}</p>
+
+      {/* Postava leží podél okraje – hlavou vzhůru, tělem napůl mimo stránku. */}
+      <div className={`w-28 h-28 -mt-1 ${isLeft ? "-ml-14" : "-mr-14"}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/Gutenberg.svg"
+          alt=""
+          aria-hidden="true"
+          className={`w-full h-full object-contain animate-drift ${
+            isLeft ? "rotate-70" : "-rotate-70"
+          }`}
+        />
       </div>
     </div>
   );
@@ -150,6 +182,7 @@ export default function QuestionPage({
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<"teaser" | "scanning" | "answering" | "correct" | "wrongQR">("teaser");
   const [answer, setAnswer] = useState("");
+  const [answer2, setAnswer2] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [wrongMsg, setWrongMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -219,28 +252,48 @@ export default function QuestionPage({
 
   const handleSubmitAnswer = async () => {
     if (!question || submitting) return;
-    const normalised = answer.trim().toLowerCase();
-    const correct = (question.correct_answer ?? "").trim().toLowerCase();
 
-    if (normalised !== correct) {
+    const hasSecond = !!question.question_text_2?.trim();
+    const firstOk = isAnswerCorrect(answer, question.correct_answer);
+    const secondOk = !hasSecond || isAnswerCorrect(answer2, question.correct_answer_2);
+
+    if (!firstOk || !secondOk) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
+
       if (newAttempts >= MAX_ATTEMPTS) {
-        setWrongMsg(`Špatně. Správná odpověď je: ${question.correct_answer ?? ""}`);
+        const solution = hasSecond
+          ? `${primaryAnswer(question.correct_answer)} a ${primaryAnswer(question.correct_answer_2)}`
+          : primaryAnswer(question.correct_answer);
+        setWrongMsg(`Špatně. Správná odpověď je: ${solution}`);
       } else {
-        setWrongMsg(`Špatně! Máš ještě ${MAX_ATTEMPTS - newAttempts} ${MAX_ATTEMPTS - newAttempts === 1 ? "pokus" : "pokusy"}.`);
+        const left = MAX_ATTEMPTS - newAttempts;
+        // U dvou podotázek napovíme, která z nich je špatně – jinak hráč
+        // tápe, přestože jednu má dobře.
+        const which =
+          hasSecond && firstOk !== secondOk
+            ? firstOk
+              ? " Druhá odpověď nesedí."
+              : " První odpověď nesedí."
+            : "";
+        setWrongMsg(
+          `Špatně!${which} Máš ještě ${left} ${left === 1 ? "pokus" : "pokusy"}.`
+        );
       }
       return;
     }
 
     setSubmitting(true);
     const pts = currentPoints();
+    const answerText = hasSecond
+      ? `${answer.trim()} | ${answer2.trim()}`
+      : answer.trim();
 
     if (session?.groupId) {
       await supabase.from("answers").insert({
         group_id: session.groupId,
         question_id: question.id,
-        answer_text: answer.trim(),
+        answer_text: answerText,
         points_earned: pts,
         attempts: attempts + 1,
       });
@@ -379,40 +432,49 @@ export default function QuestionPage({
   // ── CORRECT – obrazovka po správné odpovědi / nahrání fotky ──
   if (phase === "correct") {
     return (
-      <MobileContainer>
-        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-green-400/20 flex items-center justify-center">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path d="M10 20l7 7 13-13" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      <MobileContainer
+        bg={question.background_url ?? undefined}
+        scrim="full"
+        bgFit="frame"
+      >
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5 text-center">
+          <div className="w-16 h-16 rounded-full bg-paper/15 border-2 border-paper/40 flex items-center justify-center">
+            <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+              <path d="M10 20l7 7 13-13" stroke="var(--color-gold)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
+
           <div>
-            <h2 className="text-3xl font-extrabold text-green-400">
-              {isPhoto ? "Hotovo! 📷" : "Správně!"}
+            <h2 className="on-photo text-3xl font-extrabold text-gold">
+              {isPhoto ? "Hotovo!" : "Správně!"}
             </h2>
-            <p className="text-white/70 mt-2 text-lg">
-              {isPhoto ? (
-                <>
-                  To je opravdu zajímavé! Máš pravdu!
-                  {session?.mode === "solo" && (question.max_points ?? 0) > 0 && (
-                    <>
-                      <br />
-                      Získáváš <span className="text-white font-bold">{question.max_points ?? 0} bodů</span>
-                    </>
-                  )}
-                </>
+            <p className="on-photo text-paper/85 mt-1 text-lg">
+              {isPhoto && !(session?.mode === "solo" && (question.max_points ?? 0) > 0) ? (
+                "Fotku máme. Body doplní knihovník."
               ) : (
-                <>Získáváš <span className="text-white font-bold">{currentPoints()} bodů</span></>
+                <>
+                  Získáváš{" "}
+                  <span className="text-paper font-bold">
+                    {isPhoto ? (question.max_points ?? 0) : currentPoints()} bodů
+                  </span>
+                </>
               )}
             </p>
           </div>
+
+          {/* Gutenbergova poznámka – reakce postavy na splněný úkol */}
+          {question.gutenberg_note && (
+            <GutenbergHint text={question.gutenberg_note} side="right" />
+          )}
+
           <button
             onClick={handleContinue}
-            className="mt-4 w-full bg-white text-[#0B5ED7] rounded-3xl font-black text-xl py-5 shadow-xl"
+            className="mt-2 w-full bg-paper text-ink rounded-[var(--radius-btn)] font-black text-xl py-4 shadow-xl shadow-ink/50 active:scale-[0.97] transition-transform"
           >
             DALŠÍ STANOVIŠTĚ →
           </button>
         </div>
+        <div className="h-28" />
         <BottomNav showQR={false} />
       </MobileContainer>
     );
@@ -442,7 +504,6 @@ export default function QuestionPage({
               <p className="text-white font-semibold text-lg leading-snug">{question.question_text}</p>
             </div>
 
-            {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
 
             {photoPreview ? (
               <div className="flex flex-col gap-3">
@@ -483,6 +544,9 @@ export default function QuestionPage({
     // Text answering
     const attemptsLeft = MAX_ATTEMPTS - attempts;
     const isOutOfAttempts = attempts >= MAX_ATTEMPTS;
+    const hasSecond = !!question.question_text_2?.trim();
+    // U dvou podotázek jde odeslat teprve, když jsou vyplněná obě pole.
+    const canSubmit = !!answer.trim() && (!hasSecond || !!answer2.trim());
 
     return (
       <MobileContainer>
@@ -499,32 +563,56 @@ export default function QuestionPage({
           )}
 
           <div className="bg-white/15 rounded-2xl p-4 border border-white/20">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Otázka</p>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">
+              {hasSecond ? "První otázka" : "Otázka"}
+            </p>
             <p className="text-white font-semibold text-lg leading-snug">{question.question_text}</p>
           </div>
 
-          {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
+          <input
+            type="text"
+            value={answer}
+            onChange={(e) => { setAnswer(e.target.value); setWrongMsg(""); }}
+            disabled={isOutOfAttempts}
+            onKeyDown={(e) => e.key === "Enter" && canSubmit && handleSubmitAnswer()}
+            placeholder="Tvoje odpověď…"
+            className="bg-white/10 border-2 border-white/30 rounded-2xl px-4 py-3
+                       text-white placeholder:text-white/40 outline-none focus:border-white
+                       disabled:opacity-50"
+          />
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={answer}
-              onChange={(e) => { setAnswer(e.target.value); setWrongMsg(""); }}
-              disabled={isOutOfAttempts}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmitAnswer()}
-              placeholder="Tvoje odpověď…"
-              className="flex-1 bg-white/10 border-2 border-white/30 rounded-2xl px-4 py-3
-                         text-white placeholder:text-white/40 outline-none focus:border-white
-                         disabled:opacity-50"
-            />
-            <button
-              onClick={handleSubmitAnswer}
-              disabled={!answer.trim() || submitting || isOutOfAttempts}
-              className="bg-white text-[#0B5ED7] rounded-2xl px-5 font-bold disabled:opacity-40"
-            >
-              →
-            </button>
-          </div>
+          {hasSecond && (
+            <>
+              <div className="bg-white/15 rounded-2xl p-4 border border-white/20">
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Druhá otázka
+                </p>
+                <p className="text-white font-semibold text-lg leading-snug">
+                  {question.question_text_2}
+                </p>
+              </div>
+
+              <input
+                type="text"
+                value={answer2}
+                onChange={(e) => { setAnswer2(e.target.value); setWrongMsg(""); }}
+                disabled={isOutOfAttempts}
+                onKeyDown={(e) => e.key === "Enter" && canSubmit && handleSubmitAnswer()}
+                placeholder="Tvoje druhá odpověď…"
+                className="bg-white/10 border-2 border-white/30 rounded-2xl px-4 py-3
+                           text-white placeholder:text-white/40 outline-none focus:border-white
+                           disabled:opacity-50"
+              />
+            </>
+          )}
+
+          <button
+            onClick={handleSubmitAnswer}
+            disabled={!canSubmit || submitting || isOutOfAttempts}
+            className="bg-paper text-ink rounded-2xl py-3 font-bold text-lg disabled:opacity-40 active:scale-[0.98] transition-transform"
+          >
+            {hasSecond ? "ODESLAT OBĚ ODPOVĚDI" : "ODESLAT"}
+          </button>
 
           {wrongMsg && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
@@ -553,42 +641,35 @@ export default function QuestionPage({
   }
 
   // ── TEASER – výchozí stav (první část otázky, s lištou dole) ──
-  return (
-    <MobileContainer>
-      <div className="flex items-center justify-between px-4 pt-4">
-        <div className="text-white/50 text-sm font-medium">
-          Stanoviště {qrcode.replace("q", "")}
-        </div>
-      </div>
+  // Bublina se střídá vlevo/vpravo podle pořadí, aby nezakrývala pořád
+  // stejnou část fotky.
+  const hintSide = (question.order_number ?? 0) % 2 === 0 ? "left" : "right";
 
-      <div className="flex-1 flex flex-col">
-        {question.background_url && (
-          <div className="w-full h-52 relative overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={question.background_url} alt="Stanoviště" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0B5ED7]" />
-          </div>
+  return (
+    <MobileContainer
+      bg={question.background_url ?? undefined}
+      bgAlt=""
+      scrim="soft"
+      bgFit="frame"
+      priority
+    >
+      <div className="px-5 pt-8 flex flex-col gap-6">
+        <LegendCard text={question.legend_text} />
+
+        {question.gutenberg_hint && (
+          <GutenbergHint text={question.gutenberg_hint} side={hintSide} />
         )}
 
-        <div className="px-6 pt-4 flex-1 flex flex-col gap-4">
-          <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Legenda</p>
-            <p className="text-white text-lg leading-relaxed font-medium whitespace-pre-line">
-              {question.legend_text}
-            </p>
+        {isPhoto && (
+          <div className="self-center bg-ink/70 backdrop-blur-sm border border-paper/25 rounded-full px-4 py-1.5 text-paper/90 text-sm">
+            Na tomto stanovišti budeš fotit
           </div>
-
-          {question.gutenberg_note && <GutenbergNote text={question.gutenberg_note} />}
-
-          {isPhoto && (
-            <div className="bg-purple-600/20 border border-purple-500/30 rounded-2xl p-3 text-purple-100 text-sm text-center">
-              Na tomto stanovišti budeš fotit
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="h-24" />
+      {/* Volné místo pro fotku pod obsahem */}
+      <div className="flex-1 min-h-24" />
+      <div className="h-28" />
 
       <BottomNav onQRClick={() => setPhase("scanning")} />
     </MobileContainer>

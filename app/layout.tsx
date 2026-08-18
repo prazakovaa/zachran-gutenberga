@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Figtree, Rubik_Scribble } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/lib/session";
 
@@ -17,6 +18,25 @@ export const metadata: Metadata = {
   title: "Zachraň Gutenberga",
   description: "Dobrodružství mezi knihami.",
 };
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+});
+
+const figtree = Figtree({
+  variable: "--font-figtree",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+});
+
+const rubikScribble = Rubik_Scribble({
+  variable: "--font-rubik-scribble",
+  subsets: ["latin", "latin-ext"],
+  weight: "400",
+  display: "swap",
+});
 
 export default function RootLayout({
   children,

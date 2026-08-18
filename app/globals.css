@@ -1,10 +1,6 @@
 @import "tailwindcss";
 
-/* ══════════════════════════════════════════════════════════════════
-   IDENTITA APLIKACE — tady se mění vzhled celé hry.
-   Změníš hex a propíše se to všude (bg-ink, text-gold, border-paper…).
-   ══════════════════════════════════════════════════════════════════ */
-@theme {
+@theme static {
   /* Barvy */
   --color-ink: #0a1a2f;        /* nejtmavší – základ pod fotkou */
   --color-ink-soft: #16304f;   /* karty, lišty */
@@ -12,9 +8,9 @@
   --color-gold: #e0a83c;       /* akcent – zvýraznění, Gutenbergova poznámka */
   --color-gold-deep: #a9741a;  /* akcent tmavší (hover, stíny) */
 
-  /* Písma — konkrétní fonty načítá next/font v app/layout.tsx */
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --font-body: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-figtree), system-ui, sans-serif;
+  --font-scribble: var(--font-rubik-scribble), ui-serif, Georgia, serif;
 
   /* Zaoblení */
   --radius-card: 1.25rem;
@@ -35,13 +31,13 @@ body {
 
 /* Nadpisy — jedno místo pro celou aplikaci */
 h1, h2, h3 {
-  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
 h1 {
+  font-family: var(--font-scribble);
   font-size: clamp(2.5rem, 12vw, 3.5rem);
   line-height: 1.02;
 }
@@ -49,6 +45,14 @@ h1 {
 /* Text ležící přímo na fotce potřebuje vlastní čitelnost */
 .on-photo {
   text-shadow: 0 2px 12px rgb(0 0 0 / 0.55), 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* Scéna s fotkou: na širokém displeji se vejde celá místo přiblížení. */
+@media (min-width: 768px) {
+  [data-fit="frame"] {
+    --fit-w: var(--contain-w);
+    --fit-h: var(--contain-h);
+  }
 }
 
 /* ── Animace ─────────────────────────────────────────────────────── */

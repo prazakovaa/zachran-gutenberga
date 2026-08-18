@@ -111,6 +111,7 @@ export type Database = {
           auto_grade: boolean;
           background_url: string | null;
           correct_answer: string | null;
+          gutenberg_hint: string | null;
           gutenberg_note: string | null;
           id: number;
           is_fixed_first: boolean | null;
@@ -120,12 +121,15 @@ export type Database = {
           order_number: number;
           qr_value: string;
           question_text: string;
+          question_text_2: string | null;
+          correct_answer_2: string | null;
         };
         Insert: {
           answer_mode?: string;
           auto_grade?: boolean;
           background_url?: string | null;
           correct_answer?: string | null;
+          gutenberg_hint?: string | null;
           gutenberg_note?: string | null;
           id?: number;
           is_fixed_first?: boolean | null;
@@ -135,12 +139,15 @@ export type Database = {
           order_number: number;
           qr_value: string;
           question_text: string;
+          question_text_2: string | null;
+          correct_answer_2: string | null;
         };
         Update: {
           answer_mode?: string;
           auto_grade?: boolean;
           background_url?: string | null;
           correct_answer?: string | null;
+          gutenberg_hint?: string | null;
           gutenberg_note?: string | null;
           id?: number;
           is_fixed_first?: boolean | null;
@@ -150,6 +157,8 @@ export type Database = {
           order_number?: number;
           qr_value?: string;
           question_text?: string;
+          question_text_2?: string | null;
+          correct_answer_2?: string | null;
         };
         Relationships: [];
       };

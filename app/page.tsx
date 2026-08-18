@@ -96,7 +96,7 @@ export default function Home() {
           <img src="/logo.svg" alt="" width={150} height={30} />
         </div>
 
-        <h1 className="text-5xl font-extrabold leading-tight">
+        <h1 className="font-scribble text-5xl font-extrabold leading-tight">
           Zachraň
           <br />
           Gutenberga

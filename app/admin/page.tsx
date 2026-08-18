@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/types/database";
 import QuestionQRDownload from "@/components/admin/QuestionQRDownload";
+import ImageUpload from "@/components/admin/ImageUpload";
 
 type Question = Database["public"]["Tables"]["questions"]["Row"];
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -325,6 +326,9 @@ function QuestionsTab() {
       legend_text: editing.legend_text ?? "",
       question_text: editing.question_text,
       correct_answer: isPhoto ? "" : (editing.correct_answer ?? ""),
+      question_text_2: isPhoto || !editing.question_text_2?.trim() ? null : editing.question_text_2,
+      correct_answer_2: isPhoto || !editing.question_text_2?.trim() ? null : (editing.correct_answer_2 ?? ""),
+      gutenberg_hint: editing.gutenberg_hint?.trim() ? editing.gutenberg_hint : null,
       gutenberg_note: editing.gutenberg_note?.trim() ? editing.gutenberg_note : null,
       qr_value: editing.qr_value.trim(),
       background_url: editing.background_url,
@@ -374,6 +378,7 @@ function QuestionsTab() {
   // ── EDITOR OTÁZKY ────────────────────────────────────────────────────────
   if (editing !== null) {
     const isPhoto = editing.answer_mode === "photo";
+    const hasSecond = editing.question_text_2 !== null && editing.question_text_2 !== undefined;
     const others = questions.filter((q) => q.id !== editing.id);
     const orderNum = Number(editing.order_number);
     const orderCollision = others.find((q) => q.order_number === orderNum) ?? null;
@@ -524,15 +529,50 @@ function QuestionsTab() {
           placeholder: "Pan Gutenberg vchází do čítárny…\n\nNa stole leží výtisky denního tisku.",
         })}
 
-        {field("question_text", isPhoto ? "Znění úkolu (co mají vyfotit)" : "Znění otázky", {
+        {field("question_text", isPhoto ? "Znění úkolu (co mají vyfotit)" : (hasSecond ? "Znění první otázky" : "Znění otázky"), {
           multiline: true,
           rows: 3,
         })}
 
         {!isPhoto &&
-          field("correct_answer", "Správná odpověď", {
-            hint: "Porovnává se bez ohledu na velká/malá písmena a mezery na krajích.",
+          field("correct_answer", hasSecond ? "Správná odpověď na první" : "Správná odpověď", {
+            hint: "Nezáleží na velikosti písmen, diakritice ani mezerách navíc. Víc uznávaných odpovědí odděl čárkou: Bible, Starý zákon, Písmo svaté",
           })}
+
+        {!isPhoto && !hasSecond && (
+          <button
+            onClick={() => setEditing({ ...editing, question_text_2: " " })}
+            className="self-start bg-white/10 hover:bg-white/20 rounded-xl px-4 py-2 text-sm"
+          >
+            + Přidat druhou podotázku
+          </button>
+        )}
+
+        {!isPhoto && hasSecond && (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-white/50 text-xs uppercase tracking-wider">Druhá podotázka</p>
+              <button
+                onClick={() =>
+                  setEditing({ ...editing, question_text_2: null, correct_answer_2: null })
+                }
+                className="text-red-400 hover:text-red-300 text-xs"
+              >
+                Odebrat
+              </button>
+            </div>
+
+            {field("question_text_2", "Znění druhé otázky", { multiline: true, rows: 3 })}
+            {field("correct_answer_2", "Správná odpověď na druhou", {
+              hint: "Stejná pravidla – víc variant odděl čárkou.",
+            })}
+
+            <p className="text-white/35 text-xs">
+              Hráč uvidí obě otázky pod sebou a odeslat je může, teprve až vyplní obě pole.
+              Body dostane jen tehdy, když sedí obě odpovědi.
+            </p>
+          </div>
+        )}
 
         {isPhoto && (
           <div className="bg-purple-600/10 border border-purple-500/30 rounded-xl px-3 py-2 text-purple-200 text-sm">
@@ -540,15 +580,25 @@ function QuestionsTab() {
           </div>
         )}
 
+        {field("gutenberg_hint", "Gutenbergova nápověda", {
+          multiline: true,
+          rows: 3,
+          hint: "Bublina nad postavou na úvodní obrazovce stanoviště — hráč ji čte ještě PŘED naskenováním QR kódu. Volitelné.",
+          placeholder: "Tolik knih na jednom místě! A žádnou z nich jsem netiskl já…",
+        })}
+
         {field("gutenberg_note", "Gutenbergova poznámka", {
           multiline: true,
           rows: 3,
-          hint: "Komentář postavy, která hráče provází. Volitelné — když necháš prázdné, nezobrazí se.",
-          placeholder: "Zprávy tištěné každý den? To je rychlost, jakou jsem si neuměl představit.",
+          hint: "Bublina PO správné odpovědi — reakce postavy na to, co se hráč dozvěděl. Volitelné.",
+          placeholder: "Skvělá práce! Hned vím o trochu víc!",
         })}
 
         {field("qr_value", "QR kód hodnota", { placeholder: "např. q1" })}
-        {field("background_url", "URL obrázku (volitelné)")}
+        <ImageUpload
+          value={editing.background_url}
+          onChange={(url) => setEditing({ ...editing, background_url: url })}
+        />
 
         <div className="flex flex-col gap-1">
           {label(isPhoto ? "Max bodů (kolik může admin dát)" : "Max bodů")}
@@ -646,7 +696,8 @@ function QuestionsTab() {
         <button
           onClick={() => setEditing({
             id: 0, order_number: nextFreeOrder(), legend_text: "",
-            question_text: "", correct_answer: "", gutenberg_note: "",
+            question_text: "", correct_answer: "", question_text_2: null, correct_answer_2: null,
+            gutenberg_hint: "", gutenberg_note: "",
             qr_value: "", background_url: null,
             max_points: 10, is_fixed_first: false, is_fixed_last: false,
             answer_mode: "text", auto_grade: true,
